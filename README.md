@@ -1,6 +1,3 @@
-# cloudedbats_pathfinder
-Active bat detector, work in progress...
-
 # CloudedBats - Pathfinder
 
 This is a part of CloudedBats: http://cloudedbats.org
