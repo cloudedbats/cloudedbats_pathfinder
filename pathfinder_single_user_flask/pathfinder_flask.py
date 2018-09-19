@@ -1,44 +1,73 @@
+#!/usr/bin/python3
+# -*- coding:utf-8 -*-
+# Project: http://cloudedbats.org
+# Copyright (c) 2018 Arnold Andreasson 
+# License: MIT License (see LICENSE.txt or http://opensource.org/licenses/mit).
 
 import flask
-import math
-from bokeh.models.sources import AjaxDataSource
-from bokeh.util.string import encode_utf8
-#from .pathfinder_datastreamer import PathfinderDataStreamer
-from pathfinder_datastreamer import PathfinderDataStreamer
-from pathfinder_bokeh import PathfinderBokeh 
+# Bokeh embedded server.
+from bokeh.embed import server_document
+from bokeh.server.server import Server
+from tornado.ioloop import IOLoop
+# Bokeh plotting.
+from bokeh.layouts import column
+from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource
+from bokeh.models import WheelZoomTool, ZoomInTool, ZoomOutTool
+from bokeh.models import BoxZoomTool, PanTool, ResetTool
+from bokeh.models import Slider
+from bokeh.themes import Theme
+# Pathfinder.
+from pathfinder_single_user_flask import pathfinder_datastreamer
+from pathfinder_single_user_flask import pathfinder_bokeh
 
-app = flask.Flask(__name__)
-data_streamer = PathfinderDataStreamer()
+# Flask.
+flask_app = flask.Flask(__name__)
 
-@app.route('/')
-def index():
-    """ Main web page. """
-    return flask.render_template('pathfinder_index.html')
-
-@app.route('/data', methods=['POST'])
-def update_data():
-    """ Get data stream to AjaxDataSource object. """
-    x_list, y_list = data_streamer.get_target_data()
-    return flask.jsonify(x=x_list, y=y_list)
-
-@app.route('/bokeh')
-def bokeh():
+def modify_bokeh_document(bokeh_document):
     """ """
-    # Bokeh AjaxDataSource for streaming data. Placed here due to url.
-    data_source = AjaxDataSource(data_url="/data",
-                                 polling_interval=200, mode='append', 
-                                 max_size=10000, )
-    # 
-    pathfinder_bokeh = PathfinderBokeh(data_source)
-    js_resources, css_resources, script, div = pathfinder_bokeh.bokeh()
-    html = flask.render_template('pathfinder_bokeh.html', 
-                                 plot_script=script, 
-                                 plot_div=div, 
-                                 js_resources=js_resources, 
-                                 css_resources=css_resources, )
-    return encode_utf8(html)
+    sound_stream = pathfinder_datastreamer.PathfinderDataStreamer()
+    sound_stream.start_streaming()
+    print('--- STREAMING STARTED ---')
+        
+    data_source = ColumnDataSource({'x': [], 'y': [], 'ix': [], 'amp': []})
+    
+    def data_source_update():
+        """ """
+        x_list, y_list, index_list, amp_list = sound_stream.get_target_data()
+        new = {'x': x_list, 'y': y_list, 'ix': index_list, 'amp': amp_list}
+        print('--- data_source_update, length: ', len(x_list))
+        data_source.stream(new, rollover=50000)
+    #
+    bokeh_document.add_periodic_callback(data_source_update, 300)
+    
+    # Bokeh plotting.
+    pathfinder_bokeh.PathfinderBokeh().bokeh(data_source, bokeh_document)
+    # Style.
+#     bokeh_document.theme = Theme(filename="theme.yaml")
 
-# Main.
+
+@flask_app.route('/', methods=['GET'])
+def bkapp_page():
+    script = server_document('http://localhost:5006/bkapp')
+    return flask.render_template("pathfinder_bokeh.html", script=script, template="Flask")
+
+
+def bk_worker():
+    server = Server({'/bkapp': modify_bokeh_document}, 
+                    io_loop=IOLoop(), 
+                    allow_websocket_origin=["localhost:5000"])
+    server.start()
+    server.io_loop.start()
+
+from threading import Thread
+Thread(target=bk_worker).start()
+
 if __name__ == '__main__':
-    app.run(debug=True, port=28888)
+    """ """
+    print('CloudedBats - Pathfinder. Open web browser at http://localhost:5000/')
+    print('Note: Single user only.')
+
+    flask_app.run(debug=False, host='0.0.0.0', port=5000)
+    
     
