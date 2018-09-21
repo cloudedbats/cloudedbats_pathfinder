@@ -59,7 +59,7 @@ class SoundSourceReadFiles(sound_stream_manager.SoundSourceBase):
         """ """
         super().__init__()
         
-        self.sound_file_name = '../data/WURB-2_20160908T220024+0200_N57.6627E12.6393_TE-384.wav'
+        self.sound_file_name = '../data/WURB-2_20160908T220024+0200_N57.6627E12.6393_TE384_part.wav'
         
         self.wave_reader = None
         
