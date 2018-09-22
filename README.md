@@ -8,14 +8,17 @@ Note: This is a "work in progress" project running on a spare time basis. Contac
 
 Pathfinder is a handheld detector for bat monitoring. Except for the ultrasonic microphone, it is based on standard hardware components, and open source software. Instead of an integrated display the unit will act as a WiFi hotspot and any device with WiFi and a web browser can be connected to it. 
 
+### Design goal
+
 The design goal for the PathFinder is to make it reliable and as simple as possible to operate. 
 
-Compared to the passive detector [CloudedBats-WURB](https://github.com/cloudedbats/cloudedbats_wurb), all hardware parts and software solutions that can result in problems should be removed. This means no GPS, no switches like rec-on / rec-off / rec-auto / rpi-on / rpi-off and no configuration files. USB memory for wave files will be optional and should not breake the basic functionality if it fails in some way. Just add power to start it, and remove power for shutdown. 
+Compared to the passive detector [CloudedBats-WURB](https://github.com/cloudedbats/cloudedbats_wurb), all hardware parts and software solutions that can result in problems should be removed. This means no GPS, no switches like rec-on / rec-off / rec-auto / rpi-on / rpi-off and no configuration files. USB memory for wave files will be optional and should not break the basic functionality if it fails in some way. Timestamps and positions for recorded files will be base on info from the device running the user interface (web page). Just add power to start the Pathfinder and connect your unit to the Pathfinder WiFi network. Remove power for shutdown. 
 
-Hardware setup:
+### Hardware setup
+
 - Ultrasonic microphone with USB connection for Linux, Mac and Windows.
 - Raspberry Pi with WiFi.
-- Micro-SD card for the CloudeBats-Pathfinder software. This will be write protected to avoid problems with lost of power.
+- Micro-SD card for the CloudedBats-Pathfinder software. (Write protected to avoid problems with lost of power.)
 - USB memory for saved wave files (optional). 
 - Some LED indicators for sound detection and detector status (optional).
 - PowerBank for mobile use, USB power adapter for stationary use or car transects. 
@@ -34,7 +37,7 @@ Screenshot:
 ![Screenshot from streaming data](doc/Pathfinder_2018-09-21.jpeg?raw=true "Pathfinder - Screenshot from streaming data.")
 Image: CloudedBats.org / [CC-BY](https://creativecommons.org/licenses/by/3.0/)
 
-#### For developers:
+### For developers:
 
 Code for the test can be found here: 
 [pathfinder_single_user_flask](/pathfinder_single_user_flask)
