@@ -25,7 +25,7 @@ In this example the peak frequencies from eight time slots per ms are shown as t
 The diagrams are equal in most aspects, except for the shown time frame. 
 In the third diagram silent parts are not shown.
 
-![Screenshot from streaming data](doc/Pathfinder_2018-09-21.jpg?raw=true "Pathfinder - Screenshot from streaming data.")
+![Screenshot from streaming data](doc/Pathfinder_2018-09-21.jpeg?raw=true "Pathfinder - Screenshot from streaming data.")
 Image: CloudedBats.org / [CC-BY](https://creativecommons.org/licenses/by/3.0/)
 
 
