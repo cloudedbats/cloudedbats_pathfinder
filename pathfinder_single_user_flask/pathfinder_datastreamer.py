@@ -11,10 +11,10 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from pathfinder_single_user_flask.dsp4bats import wave_file_utils
-from pathfinder_single_user_flask.dsp4bats import time_domain_utils
-from pathfinder_single_user_flask.dsp4bats import frequency_domain_utils
-from pathfinder_single_user_flask.dsp4bats import sound_stream_manager
+from dsp4bats import wave_file_utils
+from dsp4bats import time_domain_utils
+from dsp4bats import frequency_domain_utils
+from dsp4bats import sound_stream_manager
 
 class PathfinderDataStreamer():
     """ """

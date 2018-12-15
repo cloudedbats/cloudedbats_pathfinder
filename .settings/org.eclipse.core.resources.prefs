@@ -1,0 +1,12 @@
+eclipse.preferences.version=1
+encoding//dsp4bats/__init__.py=utf-8
+encoding//dsp4bats/frequency_domain_utils.py=utf-8
+encoding//dsp4bats/sound_stream_manager.py=utf-8
+encoding//dsp4bats/time_domain_utils.py=utf-8
+encoding//dsp4bats/wave_file_utils.py=utf-8
+encoding//pathfinder/dsp4bats/sound_stream_manager.py=utf-8
+encoding//pathfinder/pathfinder_bokeh.py=utf-8
+encoding//pathfinder/pathfinder_datastreamer.py=utf-8
+encoding//pathfinder_single_user_flask/pathfinder_bokeh.py=utf-8
+encoding//pathfinder_single_user_flask/pathfinder_datastreamer.py=utf-8
+encoding//pathfinder_single_user_flask/pathfinder_flask.py=utf-8
