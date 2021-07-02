@@ -1,0 +1,20 @@
+# Pathfinder, a part of CloudedBats.org.
+
+sound_capture:
+  # device_name: HiFiBerry # Part of device name.
+  # sampling_freq_hz: 192000
+  device_name: Intel
+  sampling_freq_hz: 48000
+  channels: 2 # stereo # stereo, mono-left, mono-right.
+
+sound_pitchshifting:
+  pitch_divisor: 30
+  volume_percent: 50
+
+sound_playback:
+  # device_name: HiFiBerry # Part of device name.
+  # sampling_freq_hz: 48000
+  device_name: Intel
+  sampling_freq_hz: 48000
+  channels: 2 # stereo # stereo, mono-left, mono-right.
+

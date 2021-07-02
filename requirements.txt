@@ -1,0 +1,13 @@
+
+# 
+pyyaml
+# Sound, etc.
+pyalsaaudio
+numpy
+scipy
+# Visualisation
+bokeh
+# Raspberry Pi.
+RPi.GPIO
+# Visual Studio Code.
+black

@@ -9,7 +9,7 @@ from bokeh.layouts import column, widgetbox
 from bokeh.models.widgets import Slider
 from bokeh.plotting import figure
 from bokeh.resources import INLINE
-from bokeh.util.string import encode_utf8
+# from bokeh.util.string import encode_utf8
 from bokeh.models.sources import AjaxDataSource
 from bokeh.models import WheelZoomTool, ZoomInTool, ZoomOutTool
 from bokeh.models import BoxZoomTool, PanTool, ResetTool
