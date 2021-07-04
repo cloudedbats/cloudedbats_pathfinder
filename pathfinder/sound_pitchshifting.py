@@ -17,7 +17,8 @@ import pathfinder
 
 
 class SoundPitchshifting(object):
-    """For audio feedback by using Pitch shifting, PS.
+    """
+    For audio feedback by using Pitch shifting.
     Simple time domain implementation by using overlapped
     windows and the Kaiser window function.
     """
@@ -25,250 +26,306 @@ class SoundPitchshifting(object):
     def __init__(self, logger="DefaultLogger"):
         """ """
         self.logger = logging.getLogger(logger)
+        # From setup.
+        self.sampling_freq_in = 48000
+        self.sampling_freq_out = 48000
+        self.volume = 5.0
+        self.pitch_div_factor = 30
+        self.time_exp_freq = None
+        self.hop_out_length = None
+        self.hop_in_length = None
+        self.resample_factor = None
+        kaiser_beta = None
+        self.window_size = None
+        self.filter_order = 10
+        # Work buffers.
+        self.work_in_left = None
+        self.work_out_left = None
+        self.insert_pos = 0
+        self.work_in_right = None
+        self.work_out_right = None
 
     def setup(self, config):
         """ """
         self.config = config
-        #
-        self.in_queue = asyncio.Queue(maxsize=1000)
+        # Setup queue for data in.
+        queue_maxsize = int(self.config.get("queue_maxsize", "100"))
+        self.queue = asyncio.Queue(maxsize=queue_maxsize)
+        # List of out data queues.
         self.out_queue_list = []
 
-    def get_in_queue(self):
+    def get_queue(self):
         """ """
-        return self.in_queue
+        return self.queue
 
     def add_out_queue(self, out_queue):
         """ """
         self.out_queue_list.append(out_queue)
 
+    def calc_params(self):
+        """ """
+        config = self.config
+        try:
+            self.channels = config.get("channels", "MONO")
+            self.sampling_freq_in = int(
+                float(config.get("sampling_freq_in_hz", "192000"))
+            )
+            self.sampling_freq_out = int(
+                float(config.get("sampling_freq_out_hz", "48000"))
+            )
+            # Volume and pitch.
+            volume = config.get("volume_percent", "100")
+            self.volume = float((float(volume) / 100.0) * 10.0)
+            feedback_pitch = config.get("pitch_divisor", "30")
+            self.pitch_div_factor = int(float(feedback_pitch))
+            # Filter.
+            filter_low_khz = config.get("filter_low_khz", "15.0")
+            filter_high_khz = config.get("filter_high_khz", "150.0")
+            self.filter_low_limit_hz = int(float(filter_low_khz) * 1000.0)
+            self.filter_high_limit_hz = int(float(filter_high_khz) * 1000.0)
+            # Calculated parameters.
+            self.time_exp_freq = int(self.sampling_freq_in / self.pitch_div_factor)
+            self.hop_out_length = int(
+                self.sampling_freq_in / 1000 / self.pitch_div_factor
+            )
+            self.hop_in_length = int(self.hop_out_length * self.pitch_div_factor)
+            self.resample_factor = self.time_exp_freq / self.sampling_freq_out
+            # Buffers.
+            buffer_in_overlap_factor = 1.5
+            kaiser_beta = int(self.pitch_div_factor * 0.8)
+            self.window_size = int(self.hop_in_length * buffer_in_overlap_factor)
+            self.window_function = numpy.kaiser(self.window_size, beta=kaiser_beta)
+            #
+            # Reset work buffers.
+            self.work_in_left = None
+            self.work_out_left = None
+            self.insert_pos = 0
+            self.work_in_right = None
+            self.work_out_right = None
+
+            # For debug.
+            self.logger.debug("Feedback: freq_in: " + str(self.sampling_freq_in))
+            self.logger.debug("Feedback: freq_out: " + str(self.sampling_freq_out))
+            self.logger.debug("Feedback: volume: " + str(self.volume))
+            self.logger.debug("Feedback: pitch_factor: " + str(self.pitch_div_factor))
+            self.logger.debug("Feedback: time_exp_freq: " + str(self.time_exp_freq))
+            self.logger.debug("Feedback: hop_out_length: " + str(self.hop_out_length))
+            self.logger.debug("Feedback: hop_in_length: " + str(self.hop_in_length))
+            self.logger.debug("Feedback: resample_factor: " + str(self.resample_factor))
+            self.logger.debug("Feedback: kaiser_beta: " + str(kaiser_beta))
+            self.logger.debug("Feedback: window_size: " + str(self.window_size))
+
+        except Exception as e:
+            self.logger.error("Exception: Pitchshifting setup: " + str(e))
+
     async def start(self):
         """ """
+        self.pitchshift_active = True
 
-    # def clear(self):
-    #     """ """
-    #     self.device_name = None
-    #     self.device_freq_hz = 48000
-    #     self.resample_factor = None
-    #     self.sampling_freq_in = None
-    #     self.pitch_div_factor = 30
-    #     self.volume = 2.0
-    #     self.filter_low_limit_hz = None
-    #     self.filter_high_limit_hz = None
-    #     self.filter_order = None
-    #     self.sampling_freq_out = None
-    #     self.hop_in_length = None
-    #     self.hop_out_length = None
-    #     self.window_size = None
-    #     self.window_function = None
-    #     self.in_buffer = None
-    #     self.pitchshifting_buffer = None
-    #     # self.out_buffer = None
-    #     # Params.
-    #     self.filter_order = 10
-    #     self.max_buffer_size_s = 2.5
-    #     # self.min_adjust_buffer_s = 0.5
+        await self.run_pitchshift()
 
-    # async def set_sampling_freq(self, sampling_freq):
-    #     """ """
-    #     self.sampling_freq_in = int(float(sampling_freq))
-    #     await self.setup()
+        # # Run in executor.
+        # self.main_loop = asyncio.get_event_loop()
+        # self.pitchshift_executor = self.main_loop.run_in_executor(None, self.run_pitchshift)
 
-    # async def set_volume(self, volume):
-    #     """ """
-    #     try:
-    #         self.volume = float((float(volume) / 100.0) * 10.0)
-    #     except Exception as e:
-    #         self.logger.debug("EXCEPTION: set_volume: " + str(e))
+    async def stop(self):
+        """ """
+        self.pitchshift_active = False
+        if self.pitchshift_executor:
+            self.pitchshift_executor.cancel()
+            self.pitchshift_executor = None
 
-    # async def set_pitch(self, pitch_factor):
-    #     """ """
-    #     try:
-    #         self.pitch_div_factor = int(float(pitch_factor))
-    #         await self.setup()
-    #     except Exception as e:
-    #         self.logger.debug("EXCEPTION: set_pitch: " + str(e))
+    async def run_pitchshift(self):
+        """ """
+        # Clear queue.
+        while not self.queue.empty():
+            self.queue.get_nowait()
+            self.queue.task_done()
+        # Copy data from queue to buffer.
+        while self.pitchshift_active:
+            try:
+                data_dict = await self.queue.get()
+                if "data" in data_dict:
+                    await self.add_buffer(data_dict["data"])
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                # Logging error.
+                message = "Pitchshift, failed to read queue: " + str(e)
+                self.logger.debug(message)
 
-    # def is_active(self):
-    #     """ """
-    #     # return self.audio_callback_active
-    #     if self.alsa_playback:
-    #         return self.alsa_playback.is_active()
-    #     return False
+    def create_buffers(self):
+        """Create missing buffers."""
+        # # Mono buffers. 3 sec pitchshifting buffer length.
+        # if self.work_buffer_in_mono is None:
+        #     self.work_buffer_in_mono = numpy.array([], dtype=numpy.float32)
+        #     pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
+        #     self.work_buffer_out_mono = numpy.zeros(
+        #         pitchshifting_buffer_length, dtype=numpy.float32
+        #     )
+        #     self.insert_pos_mono = 0
+        # Left buffers. 3 sec pitchshifting buffer length.
+        if self.work_in_left is None:
+            self.work_in_left = numpy.array([], dtype=numpy.float32)
+            pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
+            self.work_out_left = numpy.zeros(
+                pitchshifting_buffer_length, dtype=numpy.float32
+            )
+            self.insert_pos = 0
+        # Right buffers. 3 sec pitchshifting buffer length.
+        if self.work_in_right is None:
+            self.work_in_right = numpy.array([], dtype=numpy.float32)
+            pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
+            self.work_out_right = numpy.zeros(
+                pitchshifting_buffer_length, dtype=numpy.float32
+            )
+            self.insert_pos = 0
 
-    # async def setup(self):
-    #     """ """
-    #     try:
-    #         # From settings.
-    #         settings_dict = await self.wurb_settings.get_settings()
-    #         # Volume and pitch.
-    #         feedback_volume = settings_dict.get("feedback_volume", "100")
-    #         self.volume = float((float(feedback_volume) / 100.0) * 10.0)
-    #         feedback_pitch = settings_dict.get("feedback_pitch", "30")
-    #         self.pitch_div_factor = int(float(feedback_pitch))
-    #         # Filter.
-    #         filter_low_khz = settings_dict.get("feedback_filter_low_khz", "15.0")
-    #         filter_high_khz = settings_dict.get("feedback_filter_high_khz", "150.0")
-    #         self.filter_low_limit_hz = int(float(filter_low_khz) * 1000.0)
-    #         self.filter_high_limit_hz = int(float(filter_high_khz) * 1000.0)
-    #         # Calculated parameters.
-    #         self.sampling_freq_out = int(self.sampling_freq_in / self.pitch_div_factor)
-    #         self.hop_out_length = int(
-    #             self.sampling_freq_in / 1000 / self.pitch_div_factor
-    #         )
-    #         self.hop_in_length = int(self.hop_out_length * self.pitch_div_factor)
-    #         self.resample_factor = self.sampling_freq_out / self.device_freq_hz
-    #         # Buffers.
-    #         buffer_in_overlap_factor = 1.5
-    #         kaiser_beta = int(self.pitch_div_factor * 0.8)
-    #         self.window_size = int(self.hop_in_length * buffer_in_overlap_factor)
-    #         self.window_function = numpy.kaiser(self.window_size, beta=kaiser_beta)
-    #         #
-    #         self.in_buffer == None
-    #         self.pitchshifting_buffer == None
+    async def add_buffer(self, buffer_int16):
+        """ """
+        # Create missing buffers.
+        self.create_buffers()
 
-    #         # For debug.
-    #         self.logger.debug(
-    #             "Audiofeedback setup: feedback_volume: " + str(self.volume)
-    #         )
-    #         self.logger.debug(
-    #             "Audiofeedback setup: feedback_pitch: " + str(self.pitch_div_factor)
-    #         )
-    #         self.logger.debug(
-    #             "Audiofeedback setup: sampling_freq_out: " + str(self.sampling_freq_out)
-    #         )
-    #         self.logger.debug(
-    #             "Audiofeedback setup: hop_out_length: " + str(self.hop_out_length)
-    #         )
-    #         self.logger.debug(
-    #             "Audiofeedback setup: hop_in_length: " + str(self.hop_in_length)
-    #         )
-    #         self.logger.debug(
-    #             "Audiofeedback setup: resample_factor: " + str(self.resample_factor)
-    #         )
-    #         self.logger.debug("Audiofeedback setup: kaiser_beta: " + str(kaiser_beta))
-    #         self.logger.debug(
-    #             "Audiofeedback setup: window_size: " + str(self.window_size)
-    #         )
+        if self.channels == "STEREO":
+            result_buffer = self.calc_pithshifting_stereo(buffer_int16)
+        else:
+            result_buffer = self.calc_pithshifting_mono(buffer_int16)
+        #
+        if len(result_buffer) > 0:
+            self.buffer_to_queues(result_buffer)
 
-    #     except Exception as e:
-    #         self.logger.debug("Exception: WurbPitchShifting: setup: " + str(e))
+    def calc_pithshifting_stereo(self, buffer_int16):
+        """ """
+        try:
+            # Buffer delivered as int16. Transform to intervall -1 to 1.
+            buffer = buffer_int16 / 32768.0
 
-    # async def startup(self):
-    #     """ """
-    #     # Shutdown if already running.
-    #     await self.shutdown()
-    #     # Check settings.
-    #     feedback_on_off = self.wurb_settings.get_setting(key="feedback_on_off")
-    #     if feedback_on_off == "feedback-on":
-    #         # Start audiofeedback.
-    #         self.asyncio_loop = asyncio.get_event_loop()
-    #         part_of_name = os.getenv("WURB_REC_OUTPUT_DEVICE", "Headphones")
-    #         ### part_of_name = os.getenv("WURB_REC_OUTPUT_DEVICE", "iMic")
-    #         sampling_freq_hz = int(os.getenv("WURB_REC_OUTPUT_DEVICE_FREQ_HZ", "48000"))
-    #         # # ALSA volume.
-    #         # wurb_rec.AlsaMixer().set_volume(volume_percent=100, card_index=-1)
-    #         # ALSA cards.
-    #         cards = wurb_rec.AlsaSoundCards()
-    #         cards.update_card_lists()
-    #         card_index = cards.get_playback_card_index_by_name(part_of_name)
-    #         if card_index != None:
-    #             self.alsa_playback = wurb_rec.AlsaSoundPlayback()
-    #             buffer_size = 1000
-    #             await self.alsa_playback.start_playback(
-    #                 card_index=card_index,
-    #                 sampling_freq=sampling_freq_hz,
-    #                 buffer_size=buffer_size,
-    #             )
-    #         else:
-    #             self.logger.debug("FAILED TO FIND PLAYBACK CARD: " + part_of_name)
+            # Separate left and right channels.
+            left_buffer = buffer[::2].copy()
+            right_buffer = buffer[1::2].copy()
 
-    # async def shutdown(self):
-    #     """ """
-    #     if self.alsa_playback:
-    #         await self.alsa_playback.stop_playback()
-    #         self.alsa_playback = None
+            # Filter buffer. Butterworth bandpass.
+            filtered_left = self.butterworth_filter(left_buffer)
+            filtered_right = self.butterworth_filter(right_buffer)
 
-    # def add_data(self, buffer_int16):
-    #     """ """
-    #     if self.is_active():
-    #         self.asyncio_loop.run_in_executor(None, self.add_buffer, buffer_int16)
+            # Concatenate with old buffer.
+            self.work_in_left = numpy.concatenate((self.work_in_left, filtered_left))
+            self.work_in_right = numpy.concatenate((self.work_in_right, filtered_right))
 
-    # def add_buffer(self, buffer_int16):
-    #     """ """
-    #     try:
-    #         # Clear buffer if not active.
-    #         if (self.alsa_playback is None) or (not self.is_active()):
-    #             self.in_buffer = None
-    #             self.pitchshifting_buffer = None
-    #             return
-    #         # Avoid too long out buffers.
-    #         out_buffer_size_s = self.alsa_playback.get_out_buffer_size_s()
-    #         if out_buffer_size_s > 1.0:
-    #             return
-    #         # Create missing buffers.
-    #         if self.in_buffer is None:
-    #             self.in_buffer = numpy.array([], dtype=numpy.float32)
-    #             pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
-    #         if self.pitchshifting_buffer is None:
-    #             self.pitchshifting_buffer = numpy.zeros(
-    #                 pitchshifting_buffer_length, dtype=numpy.float32
-    #             )  # 3 sec buffer length.
-    #         # Buffer delivered as int16. Transform to intervall -1 to 1.
-    #         buffer = buffer_int16 / 32768.0
-    #         # Filter buffer. Butterworth bandpass.
-    #         filtered = buffer
-    #         try:
-    #             low_limit_hz = self.filter_low_limit_hz
-    #             high_limit_hz = self.filter_high_limit_hz
-    #             if (high_limit_hz + 100) >= (self.sampling_freq_in / 2):
-    #                 high_limit_hz = self.sampling_freq_in / 2 - 100
-    #             if low_limit_hz < 0 or (low_limit_hz + 100 >= high_limit_hz):
-    #                 low_limit_hz = 100
-    #             sos = scipy.signal.butter(
-    #                 self.filter_order,
-    #                 [low_limit_hz, high_limit_hz],
-    #                 btype="bandpass",
-    #                 fs=self.sampling_freq_in,
-    #                 output="sos",
-    #             )
-    #             filtered = scipy.signal.sosfilt(sos, buffer)
-    #         except Exception as e:
-    #             pass
-    #             self.logger.debug("EXCEPTION: Butterworth: " + str(e))
-    #         # Concatenate with old buffer.
-    #         self.in_buffer = numpy.concatenate((self.in_buffer, filtered))
-    #         # Add overlaps on pitchshifting_buffer. Window function is applied on "part".
-    #         insert_pos = 0
-    #         while self.in_buffer.size > self.window_size:
-    #             part = self.in_buffer[: self.window_size] * self.window_function
-    #             self.in_buffer = self.in_buffer[self.hop_in_length :]
-    #             self.pitchshifting_buffer[
-    #                 insert_pos : insert_pos + self.window_size
-    #             ] += part
-    #             insert_pos += self.hop_out_length
-    #         # Flush.
-    #         new_part = self.pitchshifting_buffer[:insert_pos]
-    #         new_part_2 = self.resample(new_part)
+            # Add overlaps on pitchshifting_buffer. Window function is applied on "part".
+            self.insert_pos = 0
+            while self.work_in_left.size > self.window_size:
+                part_left = self.work_in_left[: self.window_size] * self.window_function
+                part_right = self.work_in_right[: self.window_size] * self.window_function
+                self.work_in_left = self.work_in_left[self.hop_in_length :]
+                self.work_in_right = self.work_in_right[self.hop_in_length :]
+                self.work_out_left[self.insert_pos : self.insert_pos + self.window_size] += part_left
+                self.work_out_right[self.insert_pos : self.insert_pos + self.window_size] += part_right
+                self.insert_pos += self.hop_out_length
 
-    #         new_buffer_int16 = numpy.array(
-    #             new_part_2 * 32768.0 * self.volume, dtype=numpy.int16
-    #         )
-    #         self.alsa_playback.add_data(new_buffer_int16)
+            # Flush.
+            new_part_left = self.work_out_left[:self.insert_pos].copy()
+            self.work_out_left[: self.window_size] = self.work_out_left[
+                self.insert_pos : self.insert_pos + self.window_size
+            ]
+            self.work_out_left[self.window_size :] = 0.0
 
-    #         self.pitchshifting_buffer[: self.window_size] = self.pitchshifting_buffer[
-    #             insert_pos : insert_pos + self.window_size
-    #         ]
-    #         self.pitchshifting_buffer[self.window_size :] = 0.0
-    #         insert_pos = 0
-    #         # self.logging.debug("DEBUG: Max/min amp: ", max(self.out_buffer), "   ", min(self.out_buffer))
-    #     except Exception as e:
-    #         self.logger.debug("Exception: WurbPitchShifting: add_buffer: " + str(e))
+            new_part_right = self.work_out_right[:self.insert_pos].copy()
+            self.work_out_right[: self.window_size] = self.work_out_right[
+                self.insert_pos : self.insert_pos + self.window_size
+            ]
+            self.work_out_right[self.window_size :] = 0.0
 
-    # def resample(self, x, kind="linear"):
-    #     """ Resample to 48000 Hz, in most cases, to match output devices. """
-    #     if x.size > 0:
-    #         n = int(numpy.ceil(x.size / self.resample_factor))
-    #         f = scipy.interpolate.interp1d(numpy.linspace(0, 1, x.size), x, kind)
-    #         return f(numpy.linspace(0, 1, n))
-    #     else:
-    #         return x
+            # Resample.
+            new_part_left_2 = self.resample(new_part_left)
+            new_part_right_2 = self.resample(new_part_right)
+
+            # Join left and right to stereo.
+            left_result = new_part_left_2.reshape(-1, 1)
+            right_result = new_part_right_2.reshape(-1, 1)
+            stereo_buffer = numpy.hstack((left_result, right_result))
+            stereo_buffer_2 = stereo_buffer.reshape(-1)
+
+            # Buffer to return. Convert to int16 and set volume.
+            new_buffer_int16 = numpy.array(
+                stereo_buffer_2 * 32768.0 * self.volume, dtype=numpy.int16
+            )
+
+            return new_buffer_int16
+
+        except Exception as e:
+            self.logger.debug(
+                "Exception: WurbPitchShifting: add_stereo_buffer: " + str(e)
+            )
+
+        return None
+
+    def calc_pithshifting_mono(self, buffer_int16):
+        """ """
+
+        # TODO:
+        
+
+    def buffer_to_queues(self, buffer_int16):
+        """ """
+        try:
+            # Put data on queues in the queue list.
+            for data_queue in self.out_queue_list:
+                # Copy data.
+                data_int16_copy = buffer_int16.copy()
+                # Put together.
+                data_dict = {
+                    "status": "data",
+                    "data": data_int16_copy,
+                }
+                try:
+                    # if not data_queue.full():
+                    #     self.main_loop.call_soon_threadsafe(
+                    #         data_queue.put_nowait, data_dict
+                    #     )
+                    if not data_queue.full():
+                        data_queue.put_nowait(data_dict)
+                #
+                except Exception as e:
+                    # Logging error.
+                    message = "Failed to put data on queue: " + str(e)
+                    self.logger.error(message)
+                    if not self.main_loop.is_running():
+                        # Terminate.
+                        self.capture_active = False
+                        break
+        except Exception as e:
+            self.logger.debug("Exception: WurbPitchShifting: add_buffer: " + str(e))
+
+    def butterworth_filter(self, buffer):
+        # Filter buffer. Butterworth bandpass.
+        filtered = buffer
+        try:
+            low_limit_hz = self.filter_low_limit_hz
+            high_limit_hz = self.filter_high_limit_hz
+            if (high_limit_hz + 100) >= (self.sampling_freq_in / 2):
+                high_limit_hz = self.sampling_freq_in / 2 - 100
+            if low_limit_hz < 0 or (low_limit_hz + 100 >= high_limit_hz):
+                low_limit_hz = 100
+            sos = scipy.signal.butter(
+                self.filter_order,
+                [low_limit_hz, high_limit_hz],
+                btype="bandpass",
+                fs=self.sampling_freq_in,
+                output="sos",
+            )
+            filtered = scipy.signal.sosfilt(sos, buffer)
+        except Exception as e:
+            pass
+            self.logger.debug("EXCEPTION: Butterworth: " + str(e))
+        #
+        return filtered
+
+    def resample(self, x, kind="linear"):
+        """Resample to 48000 Hz, in most cases, to match output devices."""
+        if x.size > 0:
+            n = int(numpy.ceil(x.size / self.resample_factor))
+            f = scipy.interpolate.interp1d(numpy.linspace(0, 1, x.size), x, kind)
+            return f(numpy.linspace(0, 1, n))
+        else:
+            return x

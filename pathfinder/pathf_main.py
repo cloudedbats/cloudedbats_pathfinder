@@ -12,7 +12,7 @@ import pathfinder
 
 async def main():
     """ """
-    # Set up logging and welcome message.
+    # Set up logging and print welcome message.
     log_dir_path = "../pathfinder_logging"
     log_name = "pathfinder_log.txt"
     debug_log_name = "pathfinder_debug_log.txt"
@@ -40,17 +40,15 @@ async def main():
     # Setup.
     pathfinder.sound_capture.setup(capture_config, capture_card_index)
     pathfinder.sound_pitchshifting.setup(pitchshifting_config)
+    pathfinder.sound_pitchshifting.calc_params()
     pathfinder.sound_playback.setup(playback_config, playback_card_index)
 
     # Connect via queues.
     # Sound capture -> queue -> pitch shifting -> queue -> sound playback.
-    pitch_in_queue = pathfinder.sound_pitchshifting.get_in_queue()
+    pitch_queue = pathfinder.sound_pitchshifting.get_queue()
     playback_queue = pathfinder.sound_playback.get_queue()
-    # pathfinder.sound_capture.add_out_queue(pitch_in_queue)
-    # pathfinder.pitchshifting.add_out_queue(playback_queue)
-
-    pathfinder.sound_capture.add_out_queue(playback_queue)
-
+    pathfinder.sound_capture.add_out_queue(pitch_queue)
+    pathfinder.sound_pitchshifting.add_out_queue(playback_queue)
     # Get coroutines.
     sound_pitchshifting_coro = pathfinder.sound_pitchshifting.start()
     sound_playback_coro = pathfinder.sound_playback.start()
