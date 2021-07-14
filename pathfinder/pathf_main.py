@@ -43,7 +43,7 @@ class Pathfinder:
         capture_card_index = cards.get_capture_card_index_by_name(device_name)
         # Sound playback card.
         device_name = playback_config.get("device_name", "")
-        playback_card_index = cards.get_capture_card_index_by_name(device_name)
+        playback_card_index = cards.get_playback_card_index_by_name(device_name)
 
         if (capture_card_index != None) and (playback_card_index != None):
             # Setup.
