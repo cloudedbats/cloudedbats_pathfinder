@@ -21,23 +21,27 @@ class SoundPlayback:
         self.sampling_freq_hz = None
         self.channels = None
         self.buffer_size = None
+        self.period_size = None
+        self.buffer_max_size = None
         self.playback_active = False
         self.playback_queue_active = False
         self.playback_executor = None
         self.buffer_int16 = None
         self.logger = logging.getLogger(logger)
 
-    def setup(self, config, card_index):
+    def setup(self, card_index, config):
         """ """
         self.config = config
-        self.card_index = card_index
+        self.card_index = int(card_index)
         # Setup queue for data in.
-        queue_maxsize = int(self.config.get("queue_maxsize", "100"))
-        self.queue = asyncio.Queue(maxsize=queue_maxsize)
+        in_queue_length = int(self.config["in_queue_length"])
+        self.queue = asyncio.Queue(maxsize=in_queue_length)
         # Setup for sound playback.
-        self.sampling_freq_hz = self.config.get("sampling_freq_hz", "48000")
-        self.channels = self.config.get("channels", "2")
-        self.buffer_size = int(self.config.get("buffer_size", "4096"))
+        self.sampling_freq_hz = int(self.config["sampling_freq_hz"])
+        self.channels = self.config["channels"]
+        self.buffer_size = int(self.config["buffer_size"])
+        self.period_size = int(self.config["period_size"])
+        self.buffer_max_size = int(self.config["buffer_max_size"])
 
     def get_queue(self):
         """ """
@@ -80,26 +84,33 @@ class SoundPlayback:
         # self.logger.debug("DEBUG DATA ADDED. Length: ", len(data))
         if self.buffer_int16 is None:
             self.buffer_int16 = numpy.array([], dtype=numpy.int16)
-        self.buffer_int16 = numpy.concatenate((self.buffer_int16, data))
+        # Avoid to long delay.
+        if len(self.buffer_int16) <= self.buffer_max_size:
+            self.buffer_int16 = numpy.concatenate((self.buffer_int16, data))
+        else:
+            self.logger.debug("SKIP. Len: " + str(self.buffer_int16.size))
 
     def run_playback(self):
         """ """
         pmc_play = None
+        channels = 1
+        if self.channels.upper() == "STEREO":
+            channels = 2
         self.playback_active = True
         try:
             # Setup ALSA for playback.
             pmc_play = alsaaudio.PCM(
                 alsaaudio.PCM_PLAYBACK,
                 alsaaudio.PCM_NORMAL,
-                channels=int(self.channels),
-                rate=int(self.sampling_freq_hz),
+                channels=channels,
+                rate=self.sampling_freq_hz,
                 format=alsaaudio.PCM_FORMAT_S16_LE,
-                periodsize=int(self.buffer_size),
+                periodsize=self.period_size,
                 device="sysdefault",
-                cardindex=int(self.card_index),
+                cardindex=self.card_index,
             )
             # To be used when no data in buffer.
-            silent_buffer = numpy.zeros((self.buffer_size, 1), dtype=numpy.float16)
+            silent_buffer = numpy.zeros((self.period_size, 1), dtype=numpy.float16)
             # Loop over the IO blocking part.
             while self.playback_active:
                 try:
@@ -107,14 +118,18 @@ class SoundPlayback:
                     buffer_int16 = silent_buffer
                     #
                     if (self.buffer_int16 is not None) and (
-                        self.buffer_int16.size > self.buffer_size
+                        self.buffer_int16.size >= self.period_size
                     ):
                         # Copy part to be used.
-                        buffer_int16 = self.buffer_int16[: self.buffer_size]
+                        buffer_int16 = self.buffer_int16[: self.period_size]
                         # Remove used part.
-                        self.buffer_int16 = self.buffer_int16[self.buffer_size :]
+                        self.buffer_int16 = self.buffer_int16[self.period_size :]
+
+                    #     self.logger.debug("SOUND. Len: " + str(self.buffer_int16.size))
                     # else:
-                    #     self.logger.debug("SILENCE")
+                    #     if self.buffer_int16 is not None:
+                    #         self.logger.debug("SILENCE. Len: " + str(self.buffer_int16.size))
+
                     # Convert to byte buffer and write.
                     buffer_bytes = buffer_int16.tobytes()
                     pmc_play.write(buffer_bytes)

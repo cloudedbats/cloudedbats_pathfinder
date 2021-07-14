@@ -5,4 +5,4 @@ import asyncio
 import pathfinder
 
 # Run the CloudedBats-Pathfinder.
-asyncio.run(pathfinder.main())
+asyncio.run(pathfinder.pathf_main.main())

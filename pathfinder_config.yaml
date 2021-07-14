@@ -1,20 +1,44 @@
-# Pathfinder, a part of CloudedBats.org.
+# Configuration for CloudedBats-Pathfinder, 
+# a part of CloudedBats.org.
 
 sound_capture:
-  # device_name: HiFiBerry # Part of device name.
-  # sampling_freq_hz: 192000
-  device_name: Intel
-  sampling_freq_hz: 48000
-  channels: 2 # stereo # stereo, mono-left, mono-right.
+  # device_name: Intel
+  # sampling_freq_hz: 48000
+  # channels: STEREO
+  # period_size: 1024
+  # buffer_size: 4800
 
 sound_pitchshifting:
-  pitch_divisor: 30
-  volume_percent: 50
+  # pitch_factor: 30
+  # volume_percent: 50
+  # filter_low_khz: 15.0
+  # filter_high_khz: 90.0
 
 sound_playback:
-  # device_name: HiFiBerry # Part of device name.
+  # device_name: Intel
   # sampling_freq_hz: 48000
-  device_name: Intel
-  sampling_freq_hz: 48000
-  channels: 2 # stereo # stereo, mono-left, mono-right.
 
+# Default values.
+sound_capture_default:
+  device_name: hifiberry # Part of device name.
+  sampling_freq_hz: 192000
+  channels: STEREO # STEREO, MONO, MONO-LEFT, MONO-RIGHT.
+  period_size: 9600
+  buffer_size: 19200
+
+sound_pitchshifting_default:
+  pitch_factor: 30
+  volume_percent: 50
+  filter_low_khz: 15.0
+  filter_high_khz: 90.0
+  in_queue_length: 10
+  overlap_factor: 1.5
+
+sound_playback_default:
+  device_name: Headphones # Part of device name.
+  sampling_freq_hz: 48000
+  period_size: 2048
+  buffer_size: 4800
+  buffer_max_size: 10000
+  in_queue_length: 10
+  

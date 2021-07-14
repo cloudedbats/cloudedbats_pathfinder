@@ -21,20 +21,22 @@ class SoundCapture:
         self.sampling_freq_hz = None
         self.channels = None
         self.buffer_size = None
+        self.period_size = None
         self.main_loop = None
         self.capture_executor = None
         self.logger = logging.getLogger(logger)
 
-    def setup(self, config, card_index):
+    def setup(self, card_index, config):
         """ """
         self.config = config
-        self.card_index = card_index
+        self.card_index = int(card_index)
         # List of out data queues.
         self.out_queue_list = []
         # Setup for sound capture.
-        self.sampling_freq_hz = self.config.get("sampling_freq_hz", "192000")
-        self.channels = self.config.get("channels", "2")
-        self.buffer_size = int(self.config.get("buffer_size", "4096"))
+        self.sampling_freq_hz = int(self.config["sampling_freq_hz"])
+        self.channels = self.config["channels"]
+        self.buffer_size = int(self.config["buffer_size"])
+        self.period_size = int(self.config["period_size"])
 
     def add_out_queue(self, out_queue):
         """ """
@@ -57,17 +59,19 @@ class SoundCapture:
         """ """
         pmc_capture = None
         self.capture_active = True
+        channels = 1
+        if self.channels.upper() == "STEREO":
+            channels = 2
         try:
             pmc_capture = alsaaudio.PCM(
                 alsaaudio.PCM_CAPTURE,
                 alsaaudio.PCM_NORMAL,
-                # alsaaudio.PCM_NONBLOCK,
-                channels=int(self.channels),
-                rate=int(self.sampling_freq_hz),
+                channels=channels,
+                rate=self.sampling_freq_hz,
                 format=alsaaudio.PCM_FORMAT_S16_LE,
-                periodsize=int(self.buffer_size),
+                periodsize=self.period_size,
                 device="sysdefault",
-                cardindex=int(self.card_index),
+                cardindex=self.card_index,
             )
             # Empty numpy buffer.
             in_buffer_int16 = numpy.array([], dtype=numpy.int16)
@@ -80,12 +84,13 @@ class SoundCapture:
                     # Convert from string-byte array to int16 array.
                     in_data_int16 = numpy.frombuffer(data, dtype=numpy.int16)
 
-                    # # Temporary solution for stereo sound cards that can't
-                    # # run in mono mode (or maybe related to a bug in alsaaudio).
-                    # # Extract one channel if the data array is doubled in size.
-                    # if (length * 2) == in_data_int16.size:
-                    #     in_data_int16 = in_data_int16[1::2].copy()
+                    # print("CAPTURE: length: ", length, "   data-len: ", len(in_data_int16))
 
+                    # Convert stereo to mono by using either left or right channel.
+                    if self.channels.upper() == "MONO-LEFT":
+                        in_data_int16 = in_data_int16[0::2].copy()
+                    if self.channels.upper() == "MONO-RIGHT":
+                        in_data_int16 = in_data_int16[1::2].copy()
                     # Concatenate
                     in_buffer_int16 = numpy.concatenate(
                         (in_buffer_int16, in_data_int16)
@@ -109,10 +114,14 @@ class SoundCapture:
                                     self.main_loop.call_soon_threadsafe(
                                         data_queue.put_nowait, data_dict
                                     )
+                                else:
+                                    self.logger.debug("Sound capture: Queue full.")
                             #
                             except Exception as e:
                                 # Logging error.
-                                message = "Failed to put data on queue: " + str(e)
+                                message = (
+                                    "Failed to put captured sound on queue: " + str(e)
+                                )
                                 self.logger.error(message)
                                 if not self.main_loop.is_running():
                                     # Terminate.

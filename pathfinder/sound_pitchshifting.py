@@ -39,9 +39,11 @@ class SoundPitchshifting(object):
         self.window_size = None
         self.filter_order = 10
         # Work buffers.
+        self.insert_pos = 0
+        self.work_in = None
+        self.work_out = None
         self.work_in_left = None
         self.work_out_left = None
-        self.insert_pos = 0
         self.work_in_right = None
         self.work_out_right = None
 
@@ -49,8 +51,8 @@ class SoundPitchshifting(object):
         """ """
         self.config = config
         # Setup queue for data in.
-        queue_maxsize = int(self.config.get("queue_maxsize", "100"))
-        self.queue = asyncio.Queue(maxsize=queue_maxsize)
+        in_queue_length = int(self.config["in_queue_length"])
+        self.queue = asyncio.Queue(maxsize=in_queue_length)
         # List of out data queues.
         self.out_queue_list = []
 
@@ -64,23 +66,18 @@ class SoundPitchshifting(object):
 
     def calc_params(self):
         """ """
-        config = self.config
         try:
-            self.channels = config.get("channels", "MONO")
-            self.sampling_freq_in = int(
-                float(config.get("sampling_freq_in_hz", "192000"))
-            )
-            self.sampling_freq_out = int(
-                float(config.get("sampling_freq_out_hz", "48000"))
-            )
+            self.channels = self.config["channels"]
+            self.sampling_freq_in = int(self.config["sampling_freq_in_hz"])
+            self.sampling_freq_out = int(self.config["sampling_freq_out_hz"])
             # Volume and pitch.
-            volume = config.get("volume_percent", "100")
+            volume = int(self.config["volume_percent"])
             self.volume = float((float(volume) / 100.0) * 10.0)
-            feedback_pitch = config.get("pitch_divisor", "30")
-            self.pitch_div_factor = int(float(feedback_pitch))
+            pitch_factor = int(self.config["pitch_factor"])
+            self.pitch_div_factor = int(float(pitch_factor))
             # Filter.
-            filter_low_khz = config.get("filter_low_khz", "15.0")
-            filter_high_khz = config.get("filter_high_khz", "150.0")
+            filter_low_khz = self.config["filter_low_khz"]
+            filter_high_khz = self.config["filter_high_khz"]
             self.filter_low_limit_hz = int(float(filter_low_khz) * 1000.0)
             self.filter_high_limit_hz = int(float(filter_high_khz) * 1000.0)
             # Calculated parameters.
@@ -91,15 +88,17 @@ class SoundPitchshifting(object):
             self.hop_in_length = int(self.hop_out_length * self.pitch_div_factor)
             self.resample_factor = self.time_exp_freq / self.sampling_freq_out
             # Buffers.
-            buffer_in_overlap_factor = 1.5
+            buffer_in_overlap_factor = float(self.config["overlap_factor"])
             kaiser_beta = int(self.pitch_div_factor * 0.8)
             self.window_size = int(self.hop_in_length * buffer_in_overlap_factor)
             self.window_function = numpy.kaiser(self.window_size, beta=kaiser_beta)
             #
             # Reset work buffers.
+            self.insert_pos = 0
+            self.work_in = None
+            self.work_out = None
             self.work_in_left = None
             self.work_out_left = None
-            self.insert_pos = 0
             self.work_in_right = None
             self.work_out_right = None
 
@@ -156,37 +155,42 @@ class SoundPitchshifting(object):
 
     def create_buffers(self):
         """Create missing buffers."""
-        # # Mono buffers. 3 sec pitchshifting buffer length.
-        # if self.work_buffer_in_mono is None:
-        #     self.work_buffer_in_mono = numpy.array([], dtype=numpy.float32)
-        #     pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
-        #     self.work_buffer_out_mono = numpy.zeros(
-        #         pitchshifting_buffer_length, dtype=numpy.float32
-        #     )
-        #     self.insert_pos_mono = 0
-        # Left buffers. 3 sec pitchshifting buffer length.
-        if self.work_in_left is None:
-            self.work_in_left = numpy.array([], dtype=numpy.float32)
-            pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
-            self.work_out_left = numpy.zeros(
-                pitchshifting_buffer_length, dtype=numpy.float32
-            )
-            self.insert_pos = 0
-        # Right buffers. 3 sec pitchshifting buffer length.
-        if self.work_in_right is None:
-            self.work_in_right = numpy.array([], dtype=numpy.float32)
-            pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
-            self.work_out_right = numpy.zeros(
-                pitchshifting_buffer_length, dtype=numpy.float32
-            )
-            self.insert_pos = 0
+        if self.channels == "STEREO":
+            # Left buffers.
+            if self.work_in_left is None:
+                self.work_in_left = numpy.array([], dtype=numpy.float32)
+                # 3 sec pitchshifting buffer length.
+                pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
+                self.work_out_left = numpy.zeros(
+                    pitchshifting_buffer_length, dtype=numpy.float32
+                )
+                self.insert_pos = 0
+            # Right buffers.
+            if self.work_in_right is None:
+                self.work_in_right = numpy.array([], dtype=numpy.float32)
+                # 3 sec pitchshifting buffer length.
+                pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
+                self.work_out_right = numpy.zeros(
+                    pitchshifting_buffer_length, dtype=numpy.float32
+                )
+                self.insert_pos = 0
+        else:
+            # Mono buffers.
+            if self.work_in is None:
+                self.work_in = numpy.array([], dtype=numpy.float32)
+                # 3 sec pitchshifting buffer length.
+                pitchshifting_buffer_length = int(self.sampling_freq_out * 3)
+                self.work_out = numpy.zeros(
+                    pitchshifting_buffer_length, dtype=numpy.float32
+                )
+                self.insert_pos = 0
 
     async def add_buffer(self, buffer_int16):
         """ """
         # Create missing buffers.
         self.create_buffers()
 
-        if self.channels == "STEREO":
+        if self.channels.upper() == "STEREO":
             result_buffer = self.calc_pithshifting_stereo(buffer_int16)
         else:
             result_buffer = self.calc_pithshifting_mono(buffer_int16)
@@ -216,21 +220,27 @@ class SoundPitchshifting(object):
             self.insert_pos = 0
             while self.work_in_left.size > self.window_size:
                 part_left = self.work_in_left[: self.window_size] * self.window_function
-                part_right = self.work_in_right[: self.window_size] * self.window_function
+                part_right = (
+                    self.work_in_right[: self.window_size] * self.window_function
+                )
                 self.work_in_left = self.work_in_left[self.hop_in_length :]
                 self.work_in_right = self.work_in_right[self.hop_in_length :]
-                self.work_out_left[self.insert_pos : self.insert_pos + self.window_size] += part_left
-                self.work_out_right[self.insert_pos : self.insert_pos + self.window_size] += part_right
+                self.work_out_left[
+                    self.insert_pos : self.insert_pos + self.window_size
+                ] += part_left
+                self.work_out_right[
+                    self.insert_pos : self.insert_pos + self.window_size
+                ] += part_right
                 self.insert_pos += self.hop_out_length
 
             # Flush.
-            new_part_left = self.work_out_left[:self.insert_pos].copy()
+            new_part_left = self.work_out_left[: self.insert_pos].copy()
             self.work_out_left[: self.window_size] = self.work_out_left[
                 self.insert_pos : self.insert_pos + self.window_size
             ]
             self.work_out_left[self.window_size :] = 0.0
 
-            new_part_right = self.work_out_right[:self.insert_pos].copy()
+            new_part_right = self.work_out_right[: self.insert_pos].copy()
             self.work_out_right[: self.window_size] = self.work_out_right[
                 self.insert_pos : self.insert_pos + self.window_size
             ]
@@ -262,9 +272,49 @@ class SoundPitchshifting(object):
 
     def calc_pithshifting_mono(self, buffer_int16):
         """ """
+        try:
+            # Buffer delivered as int16. Transform to intervall -1 to 1.
+            buffer = buffer_int16 / 32768.0
 
-        # TODO:
-        
+            # Filter buffer. Butterworth bandpass.
+            filtered = self.butterworth_filter(buffer)
+
+            # Concatenate with old buffer.
+            self.work_in = numpy.concatenate((self.work_in, filtered))
+
+            # Add overlaps on pitchshifting_buffer. Window function is applied on "part".
+            self.insert_pos = 0
+            while self.work_in.size > self.window_size:
+                part = self.work_in[: self.window_size] * self.window_function
+                self.work_in = self.work_in[self.hop_in_length :]
+                self.work_out[
+                    self.insert_pos : self.insert_pos + self.window_size
+                ] += part
+                self.insert_pos += self.hop_out_length
+
+            # Flush.
+            new_part = self.work_out[: self.insert_pos].copy()
+            self.work_out[: self.window_size] = self.work_out[
+                self.insert_pos : self.insert_pos + self.window_size
+            ]
+            self.work_out[self.window_size :] = 0.0
+
+            # Resample.
+            new_part_2 = self.resample(new_part)
+
+            # Buffer to return. Convert to int16 and set volume.
+            new_buffer_int16 = numpy.array(
+                new_part_2 * 32768.0 * self.volume, dtype=numpy.int16
+            )
+
+            return new_buffer_int16
+
+        except Exception as e:
+            self.logger.debug(
+                "Exception: WurbPitchShifting: add_stereo_buffer: " + str(e)
+            )
+
+        return None
 
     def buffer_to_queues(self, buffer_int16):
         """ """
@@ -285,6 +335,8 @@ class SoundPitchshifting(object):
                     #     )
                     if not data_queue.full():
                         data_queue.put_nowait(data_dict)
+                    else:
+                        self.logger.debug("Sound capture: Queue full.")
                 #
                 except Exception as e:
                     # Logging error.

@@ -59,13 +59,14 @@ class SoundCards:
         for card_dict in self.card_list:
             card_name = card_dict.get("card_name", "")
             card_index = card_dict.get("card_index", "")
-            self.logger.debug("Sound card: " + card_name + "   Index: " + str(card_index))
+            self.logger.debug(
+                "Sound card: " + card_name + "   Index: " + str(card_index)
+            )
         self.logger.debug("Sound cards capture: " + str(self.capture_card_index_list))
         self.logger.debug("Sound cards playback: " + str(self.playback_card_index_list))
 
-
     def get_capture_card_index_by_name(self, part_of_name):
-        """ Returns first found. """
+        """Returns first found."""
         for card_dict in self.card_list:
             card_name = card_dict.get("card_name", "")
             card_index = card_dict.get("card_index", "")
@@ -75,7 +76,7 @@ class SoundCards:
         return None
 
     def get_playback_card_index_by_name(self, part_of_name):
-        """ Returns first found. """
+        """Returns first found."""
         for card_dict in self.card_list:
             card_name = card_dict.get("card_name", "")
             card_index = card_dict.get("card_index", "")
@@ -85,14 +86,14 @@ class SoundCards:
         return None
 
     def get_card_dict_by_index(self, card_index):
-        """ Returns first found. """
+        """Returns first found."""
         for card_dict in self.card_list:
             if card_index == card_dict.get("card_index", ""):
                 return card_dict
         return {}
 
     def get_max_sampling_freq(self, card_index):
-        """ Only for capture devices. """
+        """Only for capture devices."""
         max_freq = -99
         inp = None
         try:

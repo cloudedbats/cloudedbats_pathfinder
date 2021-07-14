@@ -1,4 +1,4 @@
-# 
+#
 # Cloudedbats - Pathfinder.
 #
 
@@ -8,14 +8,14 @@ from pathfinder.sound_cards import SoundCards
 from pathfinder.sound_capture import SoundCapture
 from pathfinder.sound_pitchshifting import SoundPitchshifting
 from pathfinder.sound_playback import SoundPlayback
-
-from pathfinder.pathf_main import main
+from pathfinder.pathf_main import Pathfinder
 
 # To be used similar to singleton objects.
-
 logger = PathfinderLogger(logger="Pathfinder")
 config = PathfinderConfig(logger="Pathfinder")
 sound_cards = SoundCards(logger="Pathfinder")
 sound_capture = SoundCapture(logger="Pathfinder")
 sound_pitchshifting = SoundPitchshifting(logger="Pathfinder")
 sound_playback = SoundPlayback(logger="Pathfinder")
+sound_playback = SoundPlayback(logger="Pathfinder")
+pathf_main = Pathfinder(logger="Pathfinder")
