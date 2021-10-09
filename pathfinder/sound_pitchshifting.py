@@ -201,8 +201,15 @@ class SoundPitchshifting(object):
     def calc_pithshifting_stereo(self, buffer_int16):
         """ """
         try:
-            # Buffer delivered as int16. Transform to intervall -1 to 1.
+            # Buffer delivered as int16. Transform to interval -1 to 1.
             buffer = buffer_int16 / 32768.0
+
+
+            # Check sound level. Reduce if necessary to avoid clipping.
+            max_value = buffer.max() * self.volume + 0.05
+            if max_value > 1.0:
+                buffer = buffer / max_value
+
 
             # Separate left and right channels.
             left_buffer = buffer[::2].copy()
@@ -276,6 +283,13 @@ class SoundPitchshifting(object):
             # Buffer delivered as int16. Transform to intervall -1 to 1.
             buffer = buffer_int16 / 32768.0
 
+
+            # Check sound level. Reduce if necessary to avoid clipping.
+            max_value = buffer.max() * self.volume + 0.05
+            if max_value > 1.0:
+                buffer = buffer / max_value
+
+
             # Filter buffer. Butterworth bandpass.
             filtered = self.butterworth_filter(buffer)
 
@@ -347,7 +361,7 @@ class SoundPitchshifting(object):
                         self.capture_active = False
                         break
         except Exception as e:
-            self.logger.debug("Exception: WurbPitchShifting: add_buffer: " + str(e))
+            self.logger.debug("Exception: WurbPitchShifting: buffer_to_queues: " + str(e))
 
     def butterworth_filter(self, buffer):
         # Filter buffer. Butterworth bandpass.

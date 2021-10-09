@@ -18,8 +18,10 @@ from bokeh.models import BoxZoomTool, PanTool, ResetTool
 from bokeh.models import Slider
 from bokeh.themes import Theme
 # Pathfinder.
-from pathfinder_single_user_flask import pathfinder_datastreamer
-from pathfinder_single_user_flask import pathfinder_bokeh
+# from pathfinder_single_user_flask import pathfinder_datastreamer
+# from pathfinder_single_user_flask import pathfinder_bokeh
+import pathfinder_datastreamer
+import pathfinder_bokeh
 
 # Flask.
 flask_app = flask.Flask(__name__)

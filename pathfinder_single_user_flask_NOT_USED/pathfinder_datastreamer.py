@@ -11,10 +11,10 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from pathfinder_single_user_flask.dsp4bats import wave_file_utils
-from pathfinder_single_user_flask.dsp4bats import time_domain_utils
-from pathfinder_single_user_flask.dsp4bats import frequency_domain_utils
-from pathfinder_single_user_flask.dsp4bats import sound_stream_manager
+from dsp4bats import wave_file_utils
+from dsp4bats import time_domain_utils
+from dsp4bats import frequency_domain_utils
+from dsp4bats import sound_stream_manager
 
 class PathfinderDataStreamer():
     """ """
@@ -59,7 +59,7 @@ class SoundSourceReadFiles(sound_stream_manager.SoundSourceBase):
         """ """
         super().__init__()
         
-        self.sound_file_name = '../data/WURB-2_20160908T220024+0200_N57.6627E12.6393_TE384_part.wav'
+        self.sound_file_name = 'data/WURB-2_20160908T220024+0200_N57.6627E12.6393_TE384_part.wav'
         
         self.wave_reader = None
         

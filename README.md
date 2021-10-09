@@ -2,48 +2,47 @@
 
 This is a part of the CloudedBats project: http://cloudedbats.org
 
-Note: This is a "work in progress" project running on a spare time basis. Contact info below if you want to join me...
-
 ## Pathfinder
 
-Pathfinder is a handheld detector for bat monitoring. Except for the ultrasonic microphone, it is based on standard hardware components, and open source software. Instead of an integrated display the unit will act as a WiFi hotspot and any device with WiFi and a web browser can be connected to it. 
+Pathfinder is a handheld detector for active bat monitoring. 
+There is no graphical user interface and it is not possible to save recorded files, at least at the moment.
+But if the used sound card supports stereo it will be possible to listen to the sound of bats in real time in stereo, 
+to make it easier to locate where the bats are.
+Maybe there will be some kind of visualisation of the sound in the future, but main focus is to listen and not to be disturbed by the unit.
+
+Image: TODO.
 
 ### Design goal
 
 The design goal for the PathFinder is to make it reliable and as simple as possible to operate. 
+Just add power to start the Pathfinder and connect your headphones. Remove power for shutdown. 
+Some configurations can be done during installation, but not in the field.
 
-Compared to the passive detector [CloudedBats-WURB](https://github.com/cloudedbats/cloudedbats_wurb), all hardware parts and software solutions that can result in problems should be removed. This means no GPS, no switches like rec-on / rec-off / rec-auto / rpi-on / rpi-off and no configuration files. USB memory for wave files will be optional and should not break the basic functionality if it fails in some way. Timestamps and positions for recorded files will be base on info from the device running the user interface (web page). Just add power to start the Pathfinder and connect your unit to the Pathfinder WiFi network. Remove power for shutdown. 
+### Listen to bats
+
+The ultrasound emitted by bats is converted into audible sound using a technique called pitch shifting.
+That means that the time is in real time, but the frequency is divided by a factor of 30 as default. 
+In this case a bat sound at 30 kHz will then be translated to 1 kHz.
 
 ### Hardware setup
 
-- Ultrasonic microphone with USB connection for Linux, Mac and Windows.
-- Raspberry Pi with WiFi.
-- Micro-SD card for the CloudedBats-Pathfinder software. (Write protected to avoid problems with lost of power.)
-- USB memory for saved wave files (optional). 
-- Some LED indicators for sound detection and detector status (optional).
-- PowerBank for mobile use, USB power adapter for stationary use or car transects. 
-- Mobile phone, tablet or computer to run the user interface. No installation required.
+- Ultrasonic microphone with USB connection, 
+or stereo sound card/microphones that can run at a sample rater at least 192 kHz.
+- Raspberry Pi microcomputer.
+- Micro-SD card for the CloudedBats-Pathfinder software.
+- PowerBank for mobile use. 
 
-### Early test results (2018-09-22)
+### Installation:
 
-The Python library Bokeh is used to visualise the data stream in real time. 
-In this example the peak frequencies from eight time slots per ms are shown as three diagram. 
-The diagrams are equal in most aspects, except for the shown time frames. 
-In the third diagram silent parts are hidden.
+Follow the instructions for CloudedBats_WURB.
 
-Note: This is not based on Zero Crossing, it's only interpolated peak values from real time FFT. But I really like many parts from ZC, for example the compact format and the focus on call shapes. Why should users even bother about stuff like "window size" and  "windowing functions" (Hamming, Blackman-Harris, etc.), software should handle that automatically... 
+Replace the git clone row:
 
-Screenshot:
-![Screenshot from streaming data](doc/Pathfinder_2018-09-21.jpeg?raw=true "Pathfinder - Screenshot from streaming data.")
-Image: CloudedBats.org / [CC-BY](https://creativecommons.org/licenses/by/3.0/)
+    git clone https://github.com/cloudedbats/cloudedbats_pathfinder.git
 
-### For developers:
+Use the "" script to write protected the SD card to avoid problems with the abrupt power off.
 
-Code for the test can be found here: 
-[pathfinder_single_user_flask](/pathfinder_single_user_flask)
- 
-The example is using the micro web framework Flask and a test wave file is included. Run pathfinder_flask.py and connect from a web browser at address "localhost:5000".
-
+TODO: More detailed instruction...
 
 ## Contact
 
