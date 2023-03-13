@@ -2,12 +2,12 @@
 # Config.
 pyyaml
 # Sound, etc.
-pyalsaaudio
+pyaudio
 numpy
 scipy
 # Visualisation
-bokeh
+### bokeh
 # Raspberry Pi.
-RPi.GPIO
-# Visual Studio Code.
+### RPi.GPIO
+# VS Code.
 black

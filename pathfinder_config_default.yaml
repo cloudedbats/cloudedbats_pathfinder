@@ -1,0 +1,27 @@
+# Configurations for CloudedBats - Pathfinder.
+---
+
+sound_capture:
+  device_name: Pettersson
+  channels: MONO # MONO, STEREO, MONO-LEFT, MONO-RIGHT.
+  sampling_freq_hz: 384000
+  frames: 1024
+  buffer_size: 4096
+
+sound_pitchshifting:
+  channels: MONO # MONO, STEREO.
+  pitch_factor: 30
+  volume_percent: 100
+  filter_low_khz: 15.0
+  filter_high_khz: 120.0
+  overlap_factor: 1.5
+  in_queue_length: 10
+
+sound_playback:
+  device_name: Headphones
+  channels: MONO # MONO, STEREO.
+  sampling_freq_hz: 48000
+  frames: 1024
+  buffer_size: 1024
+  buffer_max_size: 10000
+  in_queue_length: 10
